@@ -3,22 +3,19 @@ import openai
 import os
 from datetime import datetime
 
-# Initialize Flask app
 app = Flask(__name__)
 
-# Initialize OpenAI client
 client = openai.OpenAI(
     api_key=os.getenv("OPENAI_API_KEY")
 )
 
-# 🆕 Master Project List mapping (Project Name ➔ Design Manager)
 project_design_manager = {
     "Redondo Beach": "Nick Zent",
     "InSite Development": "Andrew Urban",
     "San Diego Storage": "Javi Carrasco",
     "Manhattan Beach Expansion": "Hanneli Salenius-Lundberg",
     "Pasadena Build": "Utkarsh Kumar"
-    # ➔ You can add more projects here as needed
+    # ➔ add more here
 }
 
 @app.route("/parse-task", methods=["POST"])
@@ -29,7 +26,6 @@ def parse_task():
     if not task_text:
         return jsonify({"error": "Missing task_text"}), 400
 
-    # 🗓️ Inject today's date into the prompt
     today_date = datetime.utcnow().date().isoformat()
 
     prompt = f"""
@@ -51,27 +47,33 @@ Output (JSON only):
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You convert text into structured task JSON for Notion."},
+                {"role": "system", "content": "You convert task descriptions into structured JSON for Notion."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3,
             max_tokens=300
         )
 
-        # Parse the returned JSON from GPT
         json_output = response.choices[0].message.content.strip()
         task_data = eval(json_output)
 
-        # 🆕 After parsing: Lookup and assign correct Design Manager
         project_name = task_data.get("project", "").strip()
+
         if project_name in project_design_manager:
-            task_data["responsibility"] = project_design_manager[project_name]
+            assigned_manager = project_design_manager[project_name]
+            if assigned_manager:
+                task_data["responsibility"] = assigned_manager
+            else:
+                task_data["responsibility"] = "Samantha Moffitt"
+                task_data["description"] += " (⚠️ No Design Manager assigned — Samantha assigned by default.)"
+        else:
+            task_data["responsibility"] = "Samantha Moffitt"
+            task_data["description"] += " (⚠️ Project not recognized — Samantha assigned by default.)"
 
         return jsonify(task_data)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Run the app
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
