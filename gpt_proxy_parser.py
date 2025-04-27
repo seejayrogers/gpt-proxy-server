@@ -1,23 +1,3 @@
-from flask import Flask, request, jsonify
-import openai
-import os
-from datetime import datetime
-
-app = Flask(__name__)
-
-client = openai.OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
-)
-
-project_design_manager = {
-    "Redondo Beach": "Nick Zent",
-    "InSite Development": "Andrew Urban",
-    "San Diego Storage": "Javi Carrasco",
-    "Manhattan Beach Expansion": "Hanneli Salenius-Lundberg",
-    "Pasadena Build": "Utkarsh Kumar"
-    # ➔ add more here
-}
-
 @app.route("/parse-task", methods=["POST"])
 def parse_task():
     data = request.get_json()
@@ -57,8 +37,8 @@ Output (JSON only):
         json_output = response.choices[0].message.content.strip()
         task_data = eval(json_output)
 
+        # --- Responsibility Lookup ---
         project_name = task_data.get("project", "").strip()
-
         if project_name in project_design_manager:
             assigned_manager = project_design_manager[project_name]
             if assigned_manager:
@@ -70,10 +50,22 @@ Output (JSON only):
             task_data["responsibility"] = "Samantha Moffitt"
             task_data["description"] += " (⚠️ Project not recognized — Samantha assigned by default.)"
 
+        # --- Priority Calculation ---
+        due_date_str = task_data.get("due_date")
+        if due_date_str:
+            try:
+                due_date = datetime.fromisoformat(due_date_str)
+                days_until_due = (due_date - datetime.utcnow()).days
+                if days_until_due <= 3:
+                    task_data["priority"] = "High"
+                else:
+                    task_data["priority"] = "Normal"
+            except Exception as e:
+                task_data["priority"] = "Normal"
+        else:
+            task_data["priority"] = "Normal"
+
         return jsonify(task_data)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
