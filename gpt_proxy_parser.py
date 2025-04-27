@@ -1,13 +1,4 @@
-from flask import Flask, request, jsonify
-import openai
-import os
-
-app = Flask(__name__)
-
-# Create OpenAI client properly
-client = openai.OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
-)
+from datetime import datetime
 
 @app.route("/parse-task", methods=["POST"])
 def parse_task():
@@ -17,7 +8,11 @@ def parse_task():
     if not task_text:
         return jsonify({"error": "Missing task_text"}), 400
 
+    # 🆕 Insert today's real date
+    today_date = datetime.utcnow().date().isoformat()
+
     prompt = f"""
+Today is {today_date}.
 You are a task parser for Notion. Convert this natural language into a JSON object with:
 - title
 - responsibility
@@ -25,16 +20,17 @@ You are a task parser for Notion. Convert this natural language into a JSON obje
 - due_date (ISO format, like 2025-04-27)
 - description
 
-Input: {task_text}
+Input:
+{task_text}
+
 Output (JSON only):
 """
 
     try:
-        # NEW: Using OpenAI v1.x client method
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You convert text into structured task JSON."},
+                {"role": "system", "content": "You convert task descriptions into structured JSON objects for Notion."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3,
@@ -45,6 +41,3 @@ Output (JSON only):
         return jsonify(eval(json_output))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
