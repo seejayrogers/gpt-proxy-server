@@ -1,3 +1,25 @@
+from flask import Flask, request, jsonify
+import openai
+import os
+from datetime import datetime, timedelta  # ✅ important!
+
+app = Flask(__name__)
+
+# Initialize OpenAI client
+client = openai.OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY")
+)
+
+# Project ➔ Design Manager Mapping
+project_design_manager = {
+    "Redondo Beach": "Nick Zent",
+    "InSite Development": "Andrew Urban",
+    "San Diego Storage": "Javi Carrasco",
+    "Manhattan Beach Expansion": "Hanneli Salenius-Lundberg",
+    "Pasadena Build": "Utkarsh Kumar"
+    # ➔ Add more here if needed
+}
+
 @app.route("/parse-task", methods=["POST"])
 def parse_task():
     data = request.get_json()
@@ -27,7 +49,7 @@ Output (JSON only):
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You convert task descriptions into structured JSON for Notion."},
+                {"role": "system", "content": "You convert text into structured task JSON for Notion."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3,
@@ -37,7 +59,7 @@ Output (JSON only):
         json_output = response.choices[0].message.content.strip()
         task_data = eval(json_output)
 
-        # --- Responsibility Lookup ---
+        # --- Responsibility Assignment ---
         project_name = task_data.get("project", "").strip()
         if project_name in project_design_manager:
             assigned_manager = project_design_manager[project_name]
@@ -60,7 +82,7 @@ Output (JSON only):
                     task_data["priority"] = "High"
                 else:
                     task_data["priority"] = "Normal"
-            except Exception as e:
+            except Exception:
                 task_data["priority"] = "Normal"
         else:
             task_data["priority"] = "Normal"
@@ -69,3 +91,6 @@ Output (JSON only):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
