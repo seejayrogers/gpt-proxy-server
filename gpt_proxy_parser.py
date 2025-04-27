@@ -4,7 +4,10 @@ import os
 
 app = Flask(__name__)
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Create OpenAI client properly
+client = openai.OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY")
+)
 
 @app.route("/parse-task", methods=["POST"])
 def parse_task():
@@ -27,7 +30,8 @@ Output (JSON only):
 """
 
     try:
-        response = openai.ChatCompletion.create(
+        # NEW: Using OpenAI v1.x client method
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You convert text into structured task JSON."},
@@ -37,7 +41,7 @@ Output (JSON only):
             max_tokens=200
         )
 
-        json_output = response["choices"][0]["message"]["content"].strip()
+        json_output = response.choices[0].message.content.strip()
         return jsonify(eval(json_output))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
